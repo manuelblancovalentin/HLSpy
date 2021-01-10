@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.17)
+project(HLSpy)
+find_package(PkgConfig REQUIRED)
+set(CMAKE_CXX_STANDARD 20)
+#find_package(jsoncpp CONFIG REQUIRED)
+#pkg_check_modules(JSONCPP jsoncpp)
+#link_libraries(${JSONCPP_LIBRARIES})
+#add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/jsoncpp/lib)
+#include_directories("${JSONCPP_INCLUDE_DIRS}")
+#link_directories(${CMAKE_CURRENT_SOURCE_DIR}/jsoncpp/lib)
+add_executable(HLSpy main.cpp verilog/Parser.cpp verilog/Parser.h helpers/gui.cpp helpers/gui.h helpers/basic.cpp
+        helpers/basic.h verilog/definitions.h verilog/blocks.h verilog/design.cpp verilog/design.h
+        jsoncpp/jsoncpp.cpp jsoncpp/json/json.h jsoncpp/json/json-forwards.h helpers/hierarchy.cpp helpers/hierarchy.h)
+#target_link_libraries(${PROJECT_NAME} ${JSONCPP_LIBRARIES})
+#target_link_libraries(main PRIVATE jsoncpp_object jsoncpp_static)
