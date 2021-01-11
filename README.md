@@ -1,3 +1,6 @@
+
+<img src="./__res__/artwork/logo_blur.png" alt="drawing" width="400"/>
+
 # Verilog Cheatsheet
 
 ## Line-break instructions
