@@ -363,7 +363,7 @@
 				"type" : "reg",
 				"value" : ""
 			},
-			"ref" : "counter_tb",
+			"ref" : "module",
 			"rstb" : 
 			{
 				"arrayspan" : "[0:0]",

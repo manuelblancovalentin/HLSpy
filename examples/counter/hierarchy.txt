@@ -244,7 +244,7 @@ top_modules
      │   ├---bitspan : [0:0]
      │   ├---type : reg
      │   └---value : 
-     ├---ref : counter_tb
+     ├---ref : module
      └---rstb
          ├---arrayspan : [0:0]
          ├---bitspan : [0:0]
