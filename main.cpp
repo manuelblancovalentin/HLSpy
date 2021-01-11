@@ -15,10 +15,10 @@ int main() {
     switch (test){
         case 0:
             NAME = "ECON_AI";
-            SOURCES = {"/Users/mbvalentin/CLionProjects/HLSpy/examples/ECON_AE/auto_encoder_wrap_sim.v",
-                       "/Users/mbvalentin/CLionProjects/HLSpy/examples/ECON_AE/auto_encoder_wrap_tb.v"};
-            OUTFILE = "/Users/mbvalentin/CLionProjects/HLSpy/examples/ECON_AE/ECON_AI.json";
-            OUTFILE_TXT = "/Users/mbvalentin/CLionProjects/HLSpy/examples/ECON_AE/ECON_AI.txt";
+            SOURCES = {"/Users/mbvalentin/CLionProjects/HackDL/examples/ECON_AE/auto_encoder_wrap_sim.v",
+                       "/Users/mbvalentin/CLionProjects/HackDL/examples/ECON_AE/auto_encoder_wrap_tb.v"};
+            OUTFILE = "/Users/mbvalentin/CLionProjects/HackDL/examples/ECON_AE/ECON_AI.json";
+            OUTFILE_TXT = "/Users/mbvalentin/CLionProjects/HackDL/examples/ECON_AE/ECON_AI.txt";
             break;
 
         case 1:
