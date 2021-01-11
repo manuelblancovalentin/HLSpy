@@ -2,8 +2,7 @@
 #include <iostream>
 
 // Utilities
-#include "./verilog/Design.h"
-#include "./helpers/hierarchy.h"
+#include "./verilog/design.h"
 
 int main() {
 
@@ -28,7 +27,7 @@ int main() {
             LIB = {"/Users/mbvalentin/CLionProjects/HLSPy/examples/counter/"};
             OUTFILE = "/Users/mbvalentin/CLionProjects/HLSPy/examples/counter/hierarchy.json";
             OUTFILE_TXT = "/Users/mbvalentin/CLionProjects/HLSPy/examples/counter/hierarchy.txt";
-
+            break;
     };
 
 
