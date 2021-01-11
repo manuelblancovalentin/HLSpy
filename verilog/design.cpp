@@ -6,9 +6,6 @@
 #include "Parser.h"
 #include "blocks.h"
 #include <iostream>
-#include "../helpers/basic.cpp"
-#include "../jsoncpp/json/json.h"
-#include "../helpers/hierarchy.h"
 
 // Get hierarchy method
 Hierarchy Design::get_hierarchy() {
@@ -37,66 +34,97 @@ Hierarchy Design::get_hierarchy() {
     }
 
     // Let's try to find the top_module(s) now
-    // Fill calls with zeros
-    std::vector<int> calls = {};
-    for (auto& it: module_definitions) calls.push_back(0);
-    bool found_it = false;
+    std::vector<std::vector<int>> calls = {};
+    int niters = 0;
+    for (auto& vb: vblocks) {
+        std::vector<int> call_tmp(vb.children.size(), 0);
+        calls.push_back(call_tmp);
+        niters += call_tmp.size();
+    }
+
     // Create progressBar to display progress for unpatient asses like mine.
-    int nmods = calls.size();
-    progressBar pbar_top(nmods-1);
+    progressBar pbar_top(niters-1);
 
-    // Now find how many times each module calls other modules
-    int nm = 0;
-    for (auto& it: module_definitions){
-        pbar_top.update(nm,"","");
-        nm++;
+    // Check how many times a module children appears in the other rest of
+    std::cout << "\n[INFO] - Looking for top modules in module definitions..." << std::endl;
+    int i_accum = 0;
+    for (int i = 0; i < vblocks.size(); i++) {
+        for (int k = 0; k < vblocks[i].children.size(); k++){
+            std::string mtmp = string_format("Considering module %s as top-module candidate",vblocks[i].children[k].c_str());
+            pbar_top.update(i_accum, mtmp ,"\t");
 
-        int ninst = it.instances.size();
-        progressBar pbar_inst(ninst-1);
-
-        int ni = 0;
-        for (auto& inst: it.instances){
-            pbar_inst.update(ni,"","");
-            ni++;
-            // Find which module ref this is
-            for (int i = 0; i < module_definitions.size(); i++){
-                found_it = (std::strcmp(inst.ref.c_str(),module_definitions[i].name.c_str()) == 0);
-                if (found_it){
-                    calls[i] += 1;
-                    break;
+            // How many times do we find this moddef inside other modules children?
+            // (I know it's a bit convoluted, but this is the same as asking if this is a children
+            // of any other module)
+            for (int j = 0; j < vblocks.size(); j++){
+                if (i != j){
+                    if (find(vblocks[j].children.begin(), vblocks[j].children.end(), vblocks[i].children[k]) != vblocks[j].children.end()){
+                        // We found this module name in the children list of another vblock.
+                        // This means this is not a top_module. Add a count to it
+                        calls[i][k] += 1;
+                        break;
+                    }
                 }
             }
+            i_accum += 1;
         }
     }
+
+    // Print endline
+    std::cout << std::endl;
+
     // Now find the module(s) with the least number of calls
     int min_recurrence = INT_MAX;
     for (auto& c: calls){
-        if (c < min_recurrence){
-            min_recurrence = c;
+        for (auto& cc: c) {
+            if (cc < min_recurrence) {
+                min_recurrence = cc;
+            }
         }
     }
 
-    std::vector<VerilogBlock*> top_modules;
+    std::vector<TopModule> top_modules;
     for (int i = 0; i < calls.size(); i++){
-        if (calls[i] == min_recurrence){
-            top_modules.push_back(&(module_definitions[i]));
+        for (int j = 0; j < calls[i].size(); j++) {
+            if (calls[i][j] == min_recurrence) {
+                // Get module name
+                std::string mod_ref_tmp = vblocks[i].children[j];
+
+                // Look for ref in module_definitions
+                std::__wrap_iter<VerilogBlock *> index_ref = find_module_def(module_definitions.begin(), module_definitions.end(), mod_ref_tmp);
+                if (index_ref != module_definitions.end())
+                {
+                    std::string mtmp = string_format("\t\tModule %s set as top-module",mod_ref_tmp.c_str());
+                    std::cout << mtmp << std::endl;
+
+                    // Create temp top module
+                    TopModule tptmp(mod_ref_tmp, &(*index_ref));
+
+                    // Add to structure
+                    top_modules.push_back(tptmp);
+                }
+
+            }
         }
     }
 
-    // In theory top_modules are all those present in candidates
+    // Print endline
+    std::cout << std::endl;
+
+    // All top_modules are independent top_modules
     // With this, now we can build our design hierarchy. Let's loop thru top_modules.
-    std::vector<VerilogBlock*>::iterator citer;
     // Our hierarchy in this case will be a json object, which is extremely powerful
     // and useful for us rn
     Json::Value hierarchy;
-    for (int i = 0; i < top_modules.size(); i++){
+    for (auto& tpm: top_modules){
+        // Get name
+        std::string h_name = tpm.name;
         // Create entry for this top_module
-        VerilogBlock& tmpv = (*top_modules[i]);
-        Json::Value tmp = Design::__recursive_seeker__(tmpv, module_definitions);
-        // Append to top modules
-        std::string h_name = (*top_modules[i]).name;
+        Json::Value tmp = Design::__recursive_seeker__(*(tpm.REF), module_definitions);
+        // Append to hierarchy
         hierarchy["top_modules"][h_name] = tmp;
     }
+
 
     // Create actual hierarchy object
     Hierarchy h(hierarchy);
@@ -106,6 +134,7 @@ Hierarchy Design::get_hierarchy() {
 
     // Return and exit
     return h;
+
 }
 
 

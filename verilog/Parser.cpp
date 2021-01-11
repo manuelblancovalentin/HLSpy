@@ -4,7 +4,6 @@
 
 #include "Parser.h"
 #include "definitions.h"
-#include "../helpers/basic.cpp"
 #include "blocks.h"
 
 #include <iostream>
@@ -31,6 +30,11 @@ VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitio
     int nlines;
     int start_line = -1;
 
+    // Init ancestors/children vector
+    std::vector <std::string> ancestors = {};
+    std::vector <std::string> children = {};
+
+    // Try to open file
     if (FILENAME.empty()) {
         throw std::invalid_argument("Empty FILENAME and TEXT passed to parser. We cannot continue.");
     } else {
@@ -63,7 +67,7 @@ VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitio
 
     // Now we can call parse with the stream we just got
     VerilogBlock vlogtmp = Parser::__parse__(module_definitions, sources, lib, stream, pbar,
-                                             start_line,
+                                             start_line, ancestors, children,
                                              "",
                                              TAB, NAME, "");
 
@@ -71,7 +75,6 @@ VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitio
     stream.close();
 
     return vlogtmp;
-
 }
 
 // Parse function
@@ -81,6 +84,8 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                std::ifstream& stream,
                                progressBar& pbar,
                                int& start_line,
+                               std::vector <std::string>& ancestors,
+                               std::vector <std::string>& children,
                                std::string prev_line,
                                std::string TAB,
                                std::string NAME,
@@ -102,6 +107,14 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
     std::vector<NetWire> netwires;
     std::vector<Parameter> parameters;
     std::vector<VerilogBlock> instances;
+    std::vector<std::string> children_tmp;
+    std::vector<std::string> mod_defs_tmp_str;
+
+    // Populate tmp ancestors
+    std::vector<std::string> ancestors_tmp;
+    for (auto& a: ancestors) ancestors_tmp.push_back(a);
+    // Obviously add this reference to ancestors
+    if (!REF.empty() && (strcmp(REF.c_str(),"module")!=0)) ancestors_tmp.push_back(REF);
 
     // Start chrono
     auto start = std::chrono::high_resolution_clock::now();
@@ -301,6 +314,8 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 VerilogBlock vlogtmpmod = Parser::__parse__(module_definitions, sources, lib,
                                                             stream, pbar,
                                                             start_line,
+                                                            ancestors_tmp,
+                                                            children_tmp,
                                                             post_semicolon,
                                                             TAB_tmp,
                                                             module_name,
@@ -308,6 +323,18 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
 
                 // Push into mod_definitions
                 module_definitions.push_back(vlogtmpmod);
+                children_tmp.push_back(module_name);
+                // Add to mod_defs
+                mod_defs_tmp_str.push_back(module_name);
+
+                // Push into children
+                /*
+                for (auto& c: children) {
+                    if (std::find(children_tmp.begin(), children_tmp.end(), c) == children_tmp.end()){
+                        children_tmp.push_back(c);
+                    }
+                }
+                 */
 
                 // Setup lines
                 end_line = start_line;
@@ -1103,14 +1130,32 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 instance_tmp.ref = module_ref_name;
                 instance_tmp.name = instance_name;
                 instance_tmp.parameters = inst_params;
+                instance_tmp.ancestors = ancestors_tmp;
 
                 // Push into vector
                 instances.push_back(instance_tmp);
 
+                // Push into children vector
+                if (std::find(children_tmp.begin(), children_tmp.end(), module_ref_name) == children_tmp.end()) children_tmp.push_back(module_ref_name);
+
+                // See if we can find this instance in the module definition vector
+                /*
+                std::__wrap_iter<VerilogBlock *> index_ref = find_module_def(module_definitions.begin(), module_definitions.end(), module_ref_name);
+                if (index_ref != module_definitions.end())
+                {
+                    // Element in vector.
+                    index_ref;
+
+                }
+                 */
+
+
                 // Print message before creating module
-                message = string_format("Instance '%s' of module '%s' found from line %d to %d\n", instance_name.c_str(),
+                message = string_format("Instance '%s' of module '%s' found from line %d to %d\n",
+                                        instance_name.c_str(),
                                         module_ref_name.c_str(),
-                                        start_line + line_offset, end_line + line_offset);
+                                        start_line + line_offset,
+                                        end_line + line_offset);
                 force_print = false;
 
             } else {
@@ -1130,15 +1175,11 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
         }
 
         // Update progress bar
-        if (((end_line % delta == 0)) && (message != ""))
+        if (((end_line % delta == 0) || force_print) && (message != ""))
             pbar.update(end_line, message, TAB);
 
-        //std::this_thread::sleep_for(std::chrono::milliseconds(5) );
     }
-
-    // Close file
-    //stream.close();
-
+    
     // Get final time
     auto stop = std::chrono::high_resolution_clock::now();
 
@@ -1154,6 +1195,14 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
     vblock.netwires = netwires;
     vblock.ports = ports;
     vblock.parameters = parameters;
+    vblock.ancestors = ancestors_tmp;
+    vblock.children = children_tmp;
+    vblock.inner_moddefs = mod_defs_tmp_str;
+
+    // Make sure we append children_tmp to children
+    for (auto& c: children_tmp){
+        if (std::find(children.begin(), children.end(), c) == children.end()) children.push_back(c);
+    }
 
     // To get the value of duration use the count()
     // member function on the duration object
