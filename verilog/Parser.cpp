@@ -1179,7 +1179,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
             pbar.update(end_line, message, TAB);
 
     }
-    
+
     // Get final time
     auto stop = std::chrono::high_resolution_clock::now();
 
