@@ -58,6 +58,9 @@ struct VerilogBlock
     std::vector <NetWire> netwires;
     Ports ports;
     std::vector <Parameter> parameters;
+    std::vector <std::string> ancestors;
+    std::vector <std::string> children;
+    std::vector <std::string> inner_moddefs;
 
     // Initialize (Constructor)
     VerilogBlock(std::string Ref = "block",
@@ -65,15 +68,33 @@ struct VerilogBlock
                  std::vector<VerilogBlock> *Instances = new std::vector<VerilogBlock>(),
                  std::vector<NetWire> *NetWires = new std::vector<NetWire>(),
                  Ports *PORTS = new Ports(),
-                 std::vector <Parameter> *Parameters = new std::vector<Parameter>()){
+                 std::vector <Parameter> *Parameters = new std::vector<Parameter>(),
+                 std::vector <std::string> Ancestors = {},
+                 std::vector <std::string> Children = {},
+                 std::vector <std::string> Inner_ModDefs = {}){
         ref = Ref;
         name = Name;
         instances = *Instances;
         netwires = *NetWires;
         ports = *PORTS;
         parameters = *Parameters;
+        ancestors = Ancestors;
+        children = Children;
+        inner_moddefs = Inner_ModDefs;
     }
 
+};
+
+// Top Module
+struct TopModule {
+    std::string name;
+    VerilogBlock* REF;
+
+    // Constructor
+    TopModule(std::string Name, VerilogBlock* Ref){
+        name = Name;
+        REF = Ref;
+    }
 };
 
 #endif //HLSPY_BLOCKS_H

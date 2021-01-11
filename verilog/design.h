@@ -10,6 +10,7 @@
 #include "blocks.h"
 #include "../jsoncpp/json/json.h"
 #include "../helpers/hierarchy.h"
+#include "../helpers/basic.h"
 
 // Design class
 class Design {

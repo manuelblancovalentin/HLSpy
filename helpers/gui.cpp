@@ -5,7 +5,7 @@
 #include "gui.h"
 #include <stdio.h>
 #include <iostream>
-#include "basic.cpp"
+#include "basic.h"
 
 // Definitions
 std::string PBARFILLCHAR = "█";

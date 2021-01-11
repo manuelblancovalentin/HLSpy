@@ -21,6 +21,8 @@ private:
                            std::ifstream& stream,
                            progressBar& pbar,
                            int& start_line,
+                           std::vector <std::string>& ancestors,
+                           std::vector <std::string>& children,
                            std::string previous_line = "",
                            std::string TAB = "",
                            std::string NAME = "block",
@@ -64,5 +66,15 @@ public:
 
 bool LineChecker(std::string mainStr, std::vector<std::string> patterns, int n_patterns);
 
+
+template<class InputIterator, class T>
+InputIterator find_module_def (InputIterator first, InputIterator last, const T& val)
+{
+    while (first!=last) {
+        if ((*first).name==val) return first;
+        ++first;
+    }
+    return last;
+}
 
 #endif //HLSPY_PARSER_H
