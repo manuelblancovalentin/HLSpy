@@ -227,7 +227,7 @@ std::string Design::__recursive_seeker__(VerilogBlock& vblock,
                     }
                 } else {
                     for (auto &inst: it->second) {
-                        hierarchy_tmp += string_format("%.*s\"%s\" : {\n%.*s\"ref\": \"%s\"\n%.*s}\n",
+                        hierarchy_tmp += string_format("%.*s\"%s\" : {\n%.*s\"ref\": \"%s\"\n%.*s},\n",
                                                        TAB, tab_str,
                                                        inst.name.c_str(),
                                                        TAB, tab_str,
