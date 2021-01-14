@@ -16,6 +16,8 @@ module dff(clk, rstb, in, D, Q, nQ);
 
 	assign nQ = ~Q;
 
+    CBKF auto(.clk(clk));
+
 	always @(negedge rstb) begin
 		Q <= 1'b0;
 	end

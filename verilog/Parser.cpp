@@ -17,6 +17,7 @@
 
 // Parse file
 VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitions,
+                                    std::map<std::string,VerilogBlock>& module_references,
                                     std::vector <std::string>& sources,
                                     std::vector <std::string>& lib,
                                     std::string FILENAME,
@@ -26,7 +27,6 @@ VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitio
     std::ifstream stream(FILENAME);
 
     // This var will tell us which source we have to use to pick the next line (stream)
-    int line_source = -1;
     int nlines;
     int start_line = -1;
 
@@ -38,11 +38,6 @@ VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitio
     if (FILENAME.empty()) {
         throw std::invalid_argument("Empty FILENAME and TEXT passed to parser. We cannot continue.");
     } else {
-        // Open file buffer
-        std::ifstream stream(FILENAME);
-
-        // Setup line_source
-        line_source = 0;
 
         // Check if file is null and exit
         if (stream.fail()) {
@@ -66,7 +61,7 @@ VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitio
     progressBar pbar(nlines);
 
     // Now we can call parse with the stream we just got
-    VerilogBlock vlogtmp = Parser::__parse__(module_definitions, sources, lib, stream, pbar,
+    VerilogBlock vlogtmp = Parser::__parse__(module_definitions, module_references, sources, lib, stream, pbar,
                                              start_line, ancestors, children,
                                              "",
                                              TAB, NAME, "");
@@ -79,6 +74,7 @@ VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitio
 
 // Parse function
 VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
+                               std::map<std::string,VerilogBlock>& module_references,
                                std::vector <std::string>& sources,
                                std::vector <std::string>& lib,
                                std::ifstream& stream,
@@ -104,17 +100,24 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                           {},
                           {}};
     int port_type = -1;
+    // We must initialize everything here
+    VerilogBlock vblock;
     std::vector<NetWire> netwires;
     std::vector<Parameter> parameters;
-    std::vector<VerilogBlock> instances;
+    //std::map<std::string, std::vector<VerilogBlock*>> instances;
+    //std::vector<VerilogBlock> instances;
     std::vector<std::string> children_tmp;
     std::vector<std::string> mod_defs_tmp_str;
+    std::vector<VerilogBlock> mod_defs_tmp;
+    std::map<std::string,VerilogBlock> module_references_tmp;
+
 
     // Populate tmp ancestors
     std::vector<std::string> ancestors_tmp;
     for (auto& a: ancestors) ancestors_tmp.push_back(a);
     // Obviously add this reference to ancestors
     if (!REF.empty() && (strcmp(REF.c_str(),"module")!=0)) ancestors_tmp.push_back(REF);
+    if (!NAME.empty() && (strcmp(NAME.c_str(),"module")!=0)) ancestors_tmp.push_back(NAME);
 
     // Start chrono
     auto start = std::chrono::high_resolution_clock::now();
@@ -185,10 +188,47 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                         // Now, before we actually push it into the sources, we gotta make sure
                         // that this file exists. Otherwise, we will just ignore it.
                         if (file_exists(line)){
-                            sources.push_back(line);
-                            message = string_format("Include directive %s found at line %d added to global sources\n",
-                                                    line.c_str(), end_line + line_offset);
+                            // Also, let's make sure this file has not been already added
+                            if (find(sources.begin(),sources.end(),line)==sources.end()){
+                                // We have two options here. Either we put the file into the sources list
+                                // and parse it independently OR we parse it now. That's what the AUTO_INCLUDE
+                                // flag does. Let's check now
+                                if (Parser::flags & FLAGS::AUTO_INCLUDE){
+                                    // Create parser
+                                    VerilogBlock vlogtmp = Parser::__parse_file__(mod_defs_tmp,
+                                                                                  module_references_tmp,
+                                                                                  sources, lib,
+                                                                                  line, line);
+
+                                    // Push into instances
+                                    vblock.push(vlogtmp.name, vlogtmp);
+
+                                    //instances.push_back(vlogtmp);
+                                    //for (auto& mtp: vlogtmp.inner_modules) mod_defs_tmp.push_back(mtp);
+                                    for (auto& mtp: vlogtmp.inner_moddefs)
+                                        if (find(mod_defs_tmp_str.begin(), mod_defs_tmp_str.end(), mtp) == mod_defs_tmp_str.end())
+                                            mod_defs_tmp_str.push_back(mtp);
+                                    for (auto& mtp: vlogtmp.children)
+                                        if (find(children_tmp.begin(), children_tmp.end(), mtp) == children_tmp.end())
+                                            children_tmp.push_back(mtp);
+
+                                    message = "";
+                                    force_print = false;
+                                    break;
+
+                                } else {
+                                    sources.push_back(line);
+                                    message = string_format("Include directive %s found at line %d added to global sources\n",
+                                                            line.c_str(), end_line + line_offset);
+                                }
+
+                            } else {
+                                message = string_format("Include directive %s found at line %d but IGNORED (as source file was already parsed)\n",
+                                                        line.c_str(), end_line + line_offset);
+                            }
                             force_print = true;
+
+
                         } else {
                             // Let's check if this is an absolute path or just a file
                             std::size_t sep_pos = line.rfind(PATH_SEPARATOR);
@@ -206,12 +246,33 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
 
                                 // Now check if exists
                                 if (file_exists(full_path)){
-                                    sources.push_back(full_path);
-                                    message = string_format("Include directive %s found at line %d found at "
-                                                            "library %s and added to global sources\n",
-                                                            line.c_str(), end_line + line_offset, dir.c_str());
-                                    force_print = true;
-                                    break;
+                                    if (Parser::flags & FLAGS::AUTO_INCLUDE) {
+                                        // Create parser
+                                        VerilogBlock vlogtmp = Parser::__parse_file__(mod_defs_tmp, module_references_tmp,
+                                                                                      sources, lib,
+                                                                                      full_path, full_path);
+
+                                        //vblock.push(vlogtmp.name, &vlogtmp);
+
+                                        //for (auto& mtp: vlogtmp.inner_modules) mod_defs_tmp.push_back(mtp);
+                                        for (auto& mtp: vlogtmp.inner_moddefs)
+                                            if (find(mod_defs_tmp_str.begin(), mod_defs_tmp_str.end(), mtp) == mod_defs_tmp_str.end())
+                                                mod_defs_tmp_str.push_back(mtp);
+                                        for (auto& mtp: vlogtmp.children)
+                                            if (find(children_tmp.begin(), children_tmp.end(), mtp) == children_tmp.end())
+                                                children_tmp.push_back(mtp);
+
+                                        message = "";
+                                        force_print = false;
+                                        break;
+                                    } else {
+                                        sources.push_back(full_path);
+                                        message = string_format("Include directive %s found at line %d found at "
+                                                                "library %s and added to global sources\n",
+                                                                line.c_str(), end_line + line_offset, dir.c_str());
+                                        force_print = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -311,7 +372,8 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 std::string TAB_tmp = TAB + "\t";
 
                 // Pass stream to parser to process module content
-                VerilogBlock vlogtmpmod = Parser::__parse__(module_definitions, sources, lib,
+                VerilogBlock vlogtmp = Parser::__parse__(mod_defs_tmp, module_references_tmp,
+                                                         sources, lib,
                                                             stream, pbar,
                                                             start_line,
                                                             ancestors_tmp,
@@ -321,11 +383,32 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                                             module_name,
                                                             "module");
 
+                // build subhierarchy before returning block
+                vlogtmp.__build_subhierarchy__(TAB_tmp);
+
                 // Push into mod_definitions
-                module_definitions.push_back(vlogtmpmod);
-                children_tmp.push_back(module_name);
-                // Add to mod_defs
+                mod_defs_tmp.push_back(vlogtmp);
                 mod_defs_tmp_str.push_back(module_name);
+
+                //for (auto& mtp: vlogtmpmod.inner_modules) mod_defs_tmp.push_back(mtp);
+                for (auto& mtp: vlogtmp.inner_moddefs)
+                    if (find(mod_defs_tmp_str.begin(), mod_defs_tmp_str.end(), mtp) == mod_defs_tmp_str.end())
+                        mod_defs_tmp_str.push_back(mtp);
+                for (auto& mtp: vlogtmp.children)
+                    if (find(children_tmp.begin(), children_tmp.end(), mtp) == children_tmp.end())
+                        children_tmp.push_back(mtp);
+
+                // Module references maps
+                module_references_tmp.insert(std::pair<std::string,VerilogBlock>(module_name,vlogtmp));
+
+                if (find(children_tmp.begin(), children_tmp.end(), module_name) == children_tmp.end())
+                    children_tmp.push_back(module_name);
+
+
+                //mod_defs_tmp.push_back(&vlogtmpmod);
+                //children_tmp.push_back(module_name);
+                // Add to mod_defs
+                //mod_defs_tmp_str.push_back(module_name);
 
                 // Push into children
                 /*
@@ -595,7 +678,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
 
                 // Before we get the names, we will try to get the value
                 std::size_t pos = line.find('=');
-                std::string value = "";
+                std::string value;
                 if (pos != std::string::npos) {
                     // There is a value definition, let's parse it now
                     value = line.substr(pos);
@@ -626,13 +709,13 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 ltrim(line);
 
                 // Initialize array of NetWires
-                std::string names_msg = "";
+                std::string names_msg;
                 bool first_time = true;
                 // Store beginning and end of sentences
                 std::string::const_iterator start = line.begin();
                 std::string::const_iterator end = line.end();
                 std::string::const_iterator next = std::find(start, end, ',');
-                std::string name = "";
+                std::string name;
                 // Loop thru all splits until we find end of line
                 while (next != end) {
                     // Get name
@@ -726,7 +809,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
             // The first thing we must do is check if we can split this sentence into several statements
             // separated by ;
             std::size_t semicolon_pos = line.find(';');
-            std::string post_line = "";
+            std::string post_line;
             if (semicolon_pos != std::string::npos) {
                 // Separate post_line first
                 post_line = line.substr(semicolon_pos + 1);
@@ -750,7 +833,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
 
                 // Now parse value of parameters
                 pos = line.find('=');
-                std::string value = "";
+                std::string value;
                 if (pos != std::string::npos) {
                     // There is a value definition, let's parse it now
                     value = line.substr(pos);
@@ -764,13 +847,13 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 ltrim(line);
 
                 // Initialize array of parameters
-                std::string names_msg = "";
+                std::string names_msg;
                 bool first_time = true;
                 // Store beginning and end of sentences
                 std::string::const_iterator start = line.begin();
                 std::string::const_iterator end = line.end();
                 std::string::const_iterator next = std::find(start, end, ',');
-                std::string name = "";
+                std::string name;
                 // Loop thru all splits until we find end of line
                 while (next != end) {
                     // Get name
@@ -841,7 +924,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
             // The first thing we must do is check if we can split this sentence into several statements
             // separated by ;
             std::size_t semicolon_pos = line.find(';');
-            std::string post_line = "";
+            std::string post_line;
             if (semicolon_pos != std::string::npos) {
                 // Separate post_line first
                 prev_line = line.substr(semicolon_pos + 1);
@@ -961,7 +1044,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
             // First thing, make sure that this line ends with a semicolon. Otherwise, keep appending
             // until we find a semicolon
             std::size_t semicolon_pos = line.find(';');
-            std::string post_line = "";
+            std::string post_line;
             if (semicolon_pos != std::string::npos) {
 
                 // Divide semicolon
@@ -1133,7 +1216,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 instance_tmp.ancestors = ancestors_tmp;
 
                 // Push into vector
-                instances.push_back(instance_tmp);
+                vblock.push(module_ref_name, instance_tmp);
 
                 // Push into children vector
                 if (std::find(children_tmp.begin(), children_tmp.end(), module_ref_name) == children_tmp.end()) children_tmp.push_back(module_ref_name);
@@ -1187,17 +1270,36 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
     auto duration = duration_cast<std::chrono::seconds>(stop - start);
 
     // Populate VerilogBlock
-    VerilogBlock vblock;
     if (REF.empty()) REF = NAME;
     vblock.ref = REF;
     vblock.name = NAME;
-    vblock.instances = instances;
+    //vblock.instances = instances;
     vblock.netwires = netwires;
     vblock.ports = ports;
     vblock.parameters = parameters;
     vblock.ancestors = ancestors_tmp;
     vblock.children = children_tmp;
+    vblock.inner_modules = mod_defs_tmp;
     vblock.inner_moddefs = mod_defs_tmp_str;
+    // build subhierarchy before returning block
+    vblock.__build_subhierarchy__(TAB);
+
+    // Add module_definitions
+    for (auto& mdt: mod_defs_tmp) {
+        bool found_it = false;
+        for (int i = 0; i < module_definitions.size(); i++){
+            //std::cout << module_definitions[i].name << " & " << &(module_definitions[i]);
+            //std::cout << "\n " << mdt.name << " & " << &mdt << std::endl;
+            if (&module_definitions[i] == &mdt){
+                found_it = true;
+            }
+        }
+        if (!found_it) {
+            module_definitions.push_back(mdt);
+            module_references.insert(std::pair<std::string,VerilogBlock>(mdt.name,mdt));
+        }
+    }
+
 
     // Make sure we append children_tmp to children
     for (auto& c: children_tmp){

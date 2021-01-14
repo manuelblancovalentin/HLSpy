@@ -10,8 +10,9 @@
 
 class Hierarchy {
 private:
-    Json::Value __hierarchy__;
-    int __print__(Json::Value& h, std::string FILEPATH);
+    //Json::Value __hierarchy__;
+    std::string __hierarchy__;
+    int __print__(std::string& h, std::string FILEPATH);
 
 public:
 
@@ -26,7 +27,7 @@ public:
     int print_txt(std::string FILEPATH) {return __print__(__hierarchy__,FILEPATH);}
 
     // Constructor
-    Hierarchy(Json::Value h = new Json::Value): __hierarchy__(h) {};
+    Hierarchy(std::string h = ""): __hierarchy__(h) {};
 };
 
 

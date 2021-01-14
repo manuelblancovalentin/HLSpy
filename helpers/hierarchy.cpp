@@ -14,11 +14,13 @@ int Hierarchy::save_json(std::string FILEPATH) {
     std::ofstream file_id;
     file_id.open(FILEPATH);
 
+    file_id << Hierarchy::__hierarchy__;
+
     // Create json writer to file and write
-    Json::StreamWriterBuilder builder;
-    std::unique_ptr<Json::StreamWriter> writer(
-            builder.newStreamWriter());
-    writer->write(Hierarchy::__hierarchy__, &file_id);
+    //Json::StreamWriterBuilder builder;
+    //std::unique_ptr<Json::StreamWriter> writer(
+    //        builder.newStreamWriter());
+    //writer->write(Hierarchy::__hierarchy__, &file_id);
 
     // Close file
     file_id.close();
@@ -30,7 +32,7 @@ int Hierarchy::save_json(std::string FILEPATH) {
 }
 
 // Print tree method
-int Hierarchy::__print__(Json::Value& h, std::string FILEPATH = ""){
+int Hierarchy::__print__(std::string& h, std::string FILEPATH = ""){
 
     // Get tree
     std::string s = Hierarchy::__tree__;
@@ -38,7 +40,7 @@ int Hierarchy::__print__(Json::Value& h, std::string FILEPATH = ""){
     // Compile if empty
     if (s.empty()){
         // Call tree function on hierarchy
-        s = tree(h, "", true, true);
+        //s = tree(h, "", true, true);
 
         // Store tree in Hierarchy object
         Hierarchy::__tree__ = s;

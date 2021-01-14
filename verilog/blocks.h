@@ -7,6 +7,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 // Ports structure
 struct Ports
@@ -49,29 +50,40 @@ struct Parameter
     }
 };
 
+
+
 // VerilogBlock (module, file, whatever)
 struct VerilogBlock
 {
     std::string ref;
     std::string name;
-    std::vector <VerilogBlock> instances;
+    std::map<std::string, std::vector<VerilogBlock>> instances;
     std::vector <NetWire> netwires;
     Ports ports;
     std::vector <Parameter> parameters;
     std::vector <std::string> ancestors;
     std::vector <std::string> children;
+    std::vector <VerilogBlock> inner_modules;
     std::vector <std::string> inner_moddefs;
+    std::string subhierarchy;
+
+    bool push(std::string, VerilogBlock);
+
+    // Build subhierarchy method
+    void __build_subhierarchy__(std::string TAB);
 
     // Initialize (Constructor)
     VerilogBlock(std::string Ref = "block",
                  std::string Name = "",
-                 std::vector<VerilogBlock> *Instances = new std::vector<VerilogBlock>(),
+                 std::map<std::string, std::vector<VerilogBlock>> *Instances = new std::map<std::string, std::vector<VerilogBlock>>(),
                  std::vector<NetWire> *NetWires = new std::vector<NetWire>(),
                  Ports *PORTS = new Ports(),
                  std::vector <Parameter> *Parameters = new std::vector<Parameter>(),
                  std::vector <std::string> Ancestors = {},
                  std::vector <std::string> Children = {},
-                 std::vector <std::string> Inner_ModDefs = {}){
+                 std::vector <VerilogBlock> *Inner_Modules = new std::vector<VerilogBlock>(),
+                 std::vector <std::string> Inner_ModDefs = {},
+                 std::string subhierarchy = ""){
         ref = Ref;
         name = Name;
         instances = *Instances;
@@ -80,10 +92,13 @@ struct VerilogBlock
         parameters = *Parameters;
         ancestors = Ancestors;
         children = Children;
+        inner_modules = *Inner_Modules;
         inner_moddefs = Inner_ModDefs;
+        subhierarchy = subhierarchy;
     }
 
 };
+
 
 // Top Module
 struct TopModule {

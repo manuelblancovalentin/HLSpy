@@ -58,6 +58,8 @@ std::string getJsonValue(const Json::Value &val){
 }
 
 // Print tree
+
+/*
 std::string tree(const Json::Value &val, std::string TAB, bool last, bool first){
 
     // Init string
@@ -123,3 +125,4 @@ std::string tree(const Json::Value &val, std::string TAB, bool last, bool first)
 
     return str;
 }
+*/

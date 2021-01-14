@@ -11,13 +11,18 @@
 #include "../jsoncpp/json/json.h"
 #include "../helpers/hierarchy.h"
 #include "../helpers/basic.h"
+#include "Parser.h"
 
 // Design class
 class Design {
 
 private:
-    Json::Value __recursive_seeker__(VerilogBlock& vblock, std::vector<VerilogBlock>& mod_definitions);
+    std::string __recursive_seeker__(VerilogBlock& vblock,
+                              std::map<std::string,VerilogBlock> mod_references,
+                              int TAB = 0,
+                              const char* tab_str = "\t");
     Hierarchy __hierarchy__;
+    FLAGS* flags;
 
 public:
     std::string NAME = "design";
@@ -29,10 +34,13 @@ public:
     Hierarchy get_hierarchy(void);
 
     // Constructor
-    Design(std::string Name, std::vector<std::string> Sources, std::vector<std::string> Lib = {}){
+    Design(std::string Name, std::vector<std::string> Sources,
+           std::vector<std::string> Lib = {},
+           FLAGS* __FLAGS__ = new FLAGS(FLAGS::NONE)){
         NAME = Name;
         SOURCES = Sources;
         LIB = Lib;
+        flags = __FLAGS__;
     }
 };
 
