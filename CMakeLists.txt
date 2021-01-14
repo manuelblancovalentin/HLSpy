@@ -10,6 +10,6 @@ set(CMAKE_CXX_STANDARD 20)
 #link_directories(${CMAKE_CURRENT_SOURCE_DIR}/jsoncpp/lib)
 add_executable(HLSpy main.cpp verilog/Parser.cpp verilog/Parser.h helpers/gui.cpp helpers/gui.h helpers/basic.cpp
         helpers/basic.h verilog/definitions.h verilog/blocks.h verilog/design.cpp verilog/design.h
-        jsoncpp/jsoncpp.cpp jsoncpp/json/json.h jsoncpp/json/json-forwards.h helpers/hierarchy.cpp helpers/hierarchy.h)
+        jsoncpp/jsoncpp.cpp jsoncpp/json/json.h jsoncpp/json/json-forwards.h helpers/hierarchy.cpp helpers/hierarchy.h helpers/flags.h verilog/blocks.cpp)
 #target_link_libraries(${PROJECT_NAME} ${JSONCPP_LIBRARIES})
 #target_link_libraries(main PRIVATE jsoncpp_object jsoncpp_static)
