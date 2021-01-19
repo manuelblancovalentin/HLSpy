@@ -22,13 +22,16 @@ Hierarchy Design::get_hierarchy() {
     // We will loop thru all filenames in source
     std::vector <std::string> src_left = Design::SOURCES;
 
+    // Keep track of instances that have not been defined
+    std::map<std::string,std::vector<std::string>> orphan_instances;
+
     while (!src_left.empty()){
         // Get first element
         auto& it = src_left[0];
         // Init parser object
         Parser p(it,it,Design::flags);
         // Parse
-        VerilogBlock vlogtmp = p.parse(module_definitions, module_references, src_left, Design::LIB);
+        VerilogBlock vlogtmp = p.parse(module_definitions, module_references, src_left, Design::LIB, orphan_instances);
 
         // Pushback
         vblocks.push_back(vlogtmp);
@@ -107,6 +110,7 @@ Hierarchy Design::get_hierarchy() {
 
                     // Add to structure
                     top_modules.push_back(tptmp);
+
                 }
 
             }
@@ -116,11 +120,15 @@ Hierarchy Design::get_hierarchy() {
     // Print endline
     std::cout << std::endl;
 
+    // Check for orphan modules
+    for (auto& tp: top_modules) tp.REF->__fix_orphans__(module_references);
+
     // All top_modules are independent top_modules
     // With this, now we can build our design hierarchy. Let's loop thru top_modules.
     // Our hierarchy in this case will be a json object, which is extremely powerful
     // and useful for us rn
     //Json::Value hierarchy;
+
     std::string hierarchy = "{\n";
     hierarchy += "\t\"top_modules\":\n\t{\n";
     int TAB = 2;
@@ -133,8 +141,12 @@ Hierarchy Design::get_hierarchy() {
 
         // Create entry for this top_module
         hierarchy += string_format("%.*s\"%s\" : \n%.*s{\n", TAB, tab_str, h_name.c_str(), TAB, tab_str);
-        hierarchy += Design::__recursive_seeker__(*(top_modules[tpm].REF), module_references, TAB + 1, tab_str);
+        //hierarchy += Design::__recursive_seeker__(*(top_modules[tpm].REF), module_references, TAB + 1, tab_str,
+        //                                          &pbar,
+        //                                          &counter);
         //Json::Value tmp = Design::__recursive_seeker__(*(tpm.REF), module_definitions);
+        hierarchy += (top_modules[tpm].REF)->subhierarchy;
+
         // Append to hierarchy
         hierarchy += string_format("%.*s}", TAB, tab_str);
         //hierarchy["top_modules"][h_name] = tmp;
@@ -142,17 +154,30 @@ Hierarchy Design::get_hierarchy() {
             hierarchy += ",";
         }
         hierarchy += "\n";
+
     }
 
     // Close group
     hierarchy += "\t}\n";
     hierarchy += "}";
 
+    // Transform this to Json::Value
+    Json::Value root;
+    Json::Reader reader;
+    bool parsingSuccessful = reader.parse( hierarchy.c_str(), root );     //parse process
+    if ( !parsingSuccessful )
+    {
+        throw std::invalid_argument("Impossible to parse the json file to create hierarchy. Aborting.");
+    }
+
     // Create actual hierarchy object
-    Hierarchy h(hierarchy);
+    Hierarchy h(root);
 
     // Set hierarchy in Design (private)
     Design::__hierarchy__ = h;
+
+    // Remember to serialize
+    h.serialize_hierarchy(root);
 
     // Return and exit
     return h;
@@ -164,91 +189,102 @@ Hierarchy Design::get_hierarchy() {
 std::string Design::__recursive_seeker__(VerilogBlock& vblock,
                                  std::map<std::string, VerilogBlock> module_references,
                                  int TAB,
-                                 const char* tab_str) {
+                                 const char* tab_str,
+                                 progressBar* pbar,
+                                 int* counter) {
 
     // Init json block
     //Json::Value tmp;
     std::string hierarchy_tmp;
 
     // Check if this is a module or instance
-    if (instanceof<VerilogBlock>(&vblock)) {
 
-        // Get block name
-        std::string name = vblock.name;
+    // Get block name
+    std::string name = vblock.name;
 
-        // Get reference
-        std::string ref = vblock.ref;
+    // Get reference
+    std::string ref = vblock.ref;
 
-        // Get all fields
-        //std::vector<Parameter>* tmp_params = &vblock.parameters;
-        //Ports* tmp_ports = &vblock.ports;
-        //std::vector<NetWire>* tmp_netwires = &vblock.netwires;
-        std::map<std::string, std::vector<VerilogBlock>> tmp_instances = vblock.instances;
+    std::string message;
 
-        // If the reference does not match the name, it means we have to try to look this up
-        // in the module_definitions.
+    // Get all fields
+    //std::vector<Parameter>* tmp_params = &vblock.parameters;
+    //Ports* tmp_ports = &vblock.ports;
+    //std::vector<NetWire>* tmp_netwires = &vblock.netwires;
+    std::map<std::string, std::vector<VerilogBlock>> tmp_instances = vblock.instances;
 
-        if (std::strcmp(ref.c_str(), "module") == 0) {
-            // This is a module definition. Probably the top module. This means we can keep using
-            // it. We don't need to fetch anything. All parameters are here already.
-            std::cout << string_format("%.*sAdding %s to hierarchy", TAB, tab_str, vblock.name.c_str()) << std::endl;
+    // If the reference does not match the name, it means we have to try to look this up
+    // in the module_definitions.
+
+    if (std::strcmp(ref.c_str(), "module") == 0) {
+        // This is a module definition. Probably the top module. This means we can keep using
+        // it. We don't need to fetch anything. All parameters are here already.
+        message = string_format("%.*sAdding %s to hierarchy", TAB, tab_str, vblock.name.c_str());
+        pbar->total += tmp_instances.size();
+        *counter += 1;
+        pbar->update(*counter, message,"");
 
 
-            // Place subhierarchy of module
-            hierarchy_tmp += vblock.subhierarchy;
+        // Place subhierarchy of module
+        hierarchy_tmp += vblock.subhierarchy;
 
-            // Now we can proceed and loop thru the instances
-            // Every instance of this module will have the same definition
-            // Only its name will change
-            // We only have to apply recursivity 1 time PER MODULE DEFINITION
-            for (std::map<std::string, std::vector<VerilogBlock>>::iterator it = tmp_instances.begin();
-                 it != tmp_instances.end(); it++) {
-                std::string h_tmp_mod;
+        // Now we can proceed and loop thru the instances
+        // Every instance of this module will have the same definition
+        // Only its name will change
+        // We only have to apply recursivity 1 time PER MODULE DEFINITION
+        for (std::map<std::string, std::vector<VerilogBlock>>::iterator it = tmp_instances.begin();
+             it != tmp_instances.end(); it++) {
+            std::string h_tmp_mod;
 
-                if (module_references.contains(it->first)) {
-                    // Call recursivity
-                    h_tmp_mod = __recursive_seeker__(module_references.at(it->first), module_references, TAB + 1, tab_str);
+            if (module_references.contains(it->first)) {
+                // Call recursivity
+                h_tmp_mod = __recursive_seeker__(module_references.at(it->first), module_references,
+                                                 TAB + 1, tab_str,
+                                                 pbar, counter);
 
-                    // Now that we have the definition for the module (all recursive) let's loop thru all the instances
-                    // that use this module definition
-                    for (auto &inst: it->second) {
-                        std::cout << string_format("%.*sAdding %s to hierarchy", TAB+1, tab_str, inst.name.c_str()) << std::endl;
+                // Now that we have the definition for the module (all recursive) let's loop thru all the instances
+                // that use this module definition
+                pbar->total += it->second.size();
+                for (auto &inst: it->second) {
+                    message = string_format("%.*sAdding %s to hierarchy", TAB+1, tab_str, inst.name.c_str());
+                    *counter += 1;
+                    pbar->update(*counter, message,"");
 
-                        // Open instance def
-                        hierarchy_tmp += string_format("%.*s\"%s\" : \n%.*s{\n", TAB, tab_str, inst.name.c_str(),
-                                                       TAB, tab_str);
+                    // Open instance def
+                    hierarchy_tmp += string_format("%.*s\"%s\" : \n%.*s{\n", TAB, tab_str, inst.name.c_str(),
+                                                   TAB, tab_str);
 
-                        // Append module def
-                        hierarchy_tmp += h_tmp_mod;
+                    // Append module def
+                    hierarchy_tmp += h_tmp_mod;
 
-                        // Close inst def
-                        hierarchy_tmp += string_format("%.*s},\n", TAB, tab_str);
+                    // Close inst def
+                    hierarchy_tmp += string_format("%.*s},\n", TAB, tab_str);
 
-                    }
-                } else {
-                    for (auto &inst: it->second) {
-                        hierarchy_tmp += string_format("%.*s\"%s\" : {\n%.*s\"ref\": \"%s\"\n%.*s},\n",
-                                                       TAB, tab_str,
-                                                       inst.name.c_str(),
-                                                       TAB, tab_str,
-                                                       inst.ref.c_str(),
-                                                       TAB, tab_str);
-                    }
                 }
+            } else {
+                std::string prefix = string_format("%.*s\"", TAB, tab_str);
+                std::string postfix = string_format("\" : {\n%.*s\"ref\": \"%s\"\n%.*s},\n",TAB, tab_str,
+                                                    it->first.c_str(),
+                                                    TAB, tab_str);
 
+                pbar->total += it->second.size();
+                for (auto &inst: it->second) {
+                    hierarchy_tmp += prefix + inst.name + postfix;
+                    *counter += 1;
+                    message = string_format("%.*sAdding %s to hierarchy", TAB+1, tab_str, inst.name.c_str());
+                    pbar->update(*counter, message,"");
+                }
             }
-
-            // Discard last comma
-            if (tmp_instances.size() > 0) hierarchy_tmp = hierarchy_tmp.substr(0, hierarchy_tmp.size() - 3) + "\n";
-
-
-            // Close group
-            hierarchy_tmp += "}\n";
 
         }
 
-    } else {
-        std::cout << "What kind of pokémon is this?" << std::endl;
+        // Discard last comma
+        if (tmp_instances.size() > 0) hierarchy_tmp = hierarchy_tmp.substr(0, hierarchy_tmp.size() - 3) + "\n";
+
+
+        // Close group
+        hierarchy_tmp += "}\n";
+
     }
 
     return hierarchy_tmp;

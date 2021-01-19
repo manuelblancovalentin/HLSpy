@@ -27,6 +27,7 @@ public:
 
 
 // Print tree
-std::string tree(const Json::Value& val, std::string TAB = "", bool last = true, bool first = false);
+void tree(std::string& s, const Json::Value& val, std::string TAB = "", bool first = false,
+          std::string sep = " : ");
 
 #endif //HLSPY_GUI_H

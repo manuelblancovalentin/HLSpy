@@ -66,11 +66,15 @@ struct VerilogBlock
     std::vector <VerilogBlock> inner_modules;
     std::vector <std::string> inner_moddefs;
     std::string subhierarchy;
+    std::map<std::string, std::vector<std::string>> orphans;
 
     bool push(std::string, VerilogBlock);
 
     // Build subhierarchy method
     void __build_subhierarchy__(std::string TAB);
+
+    // Fix orphans
+    void __fix_orphans__(std::map<std::string,VerilogBlock>& module_references);
 
     // Initialize (Constructor)
     VerilogBlock(std::string Ref = "block",
@@ -83,7 +87,8 @@ struct VerilogBlock
                  std::vector <std::string> Children = {},
                  std::vector <VerilogBlock> *Inner_Modules = new std::vector<VerilogBlock>(),
                  std::vector <std::string> Inner_ModDefs = {},
-                 std::string subhierarchy = ""){
+                 std::string subhierarchy = "",
+                 std::map<std::string, std::vector<std::string>> *Orphans = new std::map<std::string, std::vector<std::string>>()){
         ref = Ref;
         name = Name;
         instances = *Instances;
@@ -95,6 +100,7 @@ struct VerilogBlock
         inner_modules = *Inner_Modules;
         inner_moddefs = Inner_ModDefs;
         subhierarchy = subhierarchy;
+        orphans = *Orphans;
     }
 
 };

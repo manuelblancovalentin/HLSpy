@@ -27,8 +27,10 @@ inline ENUMTYPE &operator ^= (ENUMTYPE &a, ENUMTYPE b) { return (ENUMTYPE &)(((i
 typedef enum _FLAGS__ {
     // Decimal            // Binary
     NONE          = 0,    // 000000
-    AUTO_INCLUDE  = 1     // 000001
-    //Fire          = 2,    // 000010
+    AUTO_INCLUDE  = 1,    // 000001
+    RELOAD = 2,           // 000010
+    MONITOR = 4,          // 000100
+    SEE = 8
 } FLAGS;
 
 DEFINE_ENUM_FLAG_OPERATORS(FLAGS);

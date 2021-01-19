@@ -20,8 +20,11 @@ private:
     std::string __recursive_seeker__(VerilogBlock& vblock,
                               std::map<std::string,VerilogBlock> mod_references,
                               int TAB = 0,
-                              const char* tab_str = "\t");
-    Hierarchy __hierarchy__;
+                              const char* tab_str = "\t",
+                              progressBar* pbar = new progressBar(),
+                              int* counter = 0
+                              );
+    Hierarchy __hierarchy__ = Hierarchy(Json::Value());
     FLAGS* flags;
 
 public:

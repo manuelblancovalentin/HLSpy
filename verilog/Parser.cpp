@@ -20,6 +20,7 @@ VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitio
                                     std::map<std::string,VerilogBlock>& module_references,
                                     std::vector <std::string>& sources,
                                     std::vector <std::string>& lib,
+                                    std::map<std::string,std::vector<std::string>>& orphan_instances,
                                     std::string FILENAME,
                                     std::string NAME){
 
@@ -61,7 +62,8 @@ VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitio
     progressBar pbar(nlines);
 
     // Now we can call parse with the stream we just got
-    VerilogBlock vlogtmp = Parser::__parse__(module_definitions, module_references, sources, lib, stream, pbar,
+    VerilogBlock vlogtmp = Parser::__parse__(module_definitions, module_references, sources, lib, orphan_instances,
+                                             stream, pbar,
                                              start_line, ancestors, children,
                                              "",
                                              TAB, NAME, "");
@@ -77,6 +79,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                std::map<std::string,VerilogBlock>& module_references,
                                std::vector <std::string>& sources,
                                std::vector <std::string>& lib,
+                               std::map<std::string,std::vector<std::string>>& orphan_instances,
                                std::ifstream& stream,
                                progressBar& pbar,
                                int& start_line,
@@ -110,7 +113,9 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
     std::vector<std::string> mod_defs_tmp_str;
     std::vector<VerilogBlock> mod_defs_tmp;
     std::map<std::string,VerilogBlock> module_references_tmp;
+    std::map<std::string,std::vector<std::string>> orphans_tmp;
 
+    //std::string subhierarchy_tmp;
 
     // Populate tmp ancestors
     std::vector<std::string> ancestors_tmp;
@@ -198,10 +203,14 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                     VerilogBlock vlogtmp = Parser::__parse_file__(mod_defs_tmp,
                                                                                   module_references_tmp,
                                                                                   sources, lib,
+                                                                                  orphans_tmp,
                                                                                   line, line);
 
                                     // Push into instances
                                     vblock.push(vlogtmp.name, vlogtmp);
+
+                                    // Add subhierarchy
+                                    //subhierarchy_tmp += vlogtmp.subhierarchy;
 
                                     //instances.push_back(vlogtmp);
                                     //for (auto& mtp: vlogtmp.inner_modules) mod_defs_tmp.push_back(mtp);
@@ -250,9 +259,12 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                         // Create parser
                                         VerilogBlock vlogtmp = Parser::__parse_file__(mod_defs_tmp, module_references_tmp,
                                                                                       sources, lib,
+                                                                                      orphans_tmp,
                                                                                       full_path, full_path);
 
-                                        //vblock.push(vlogtmp.name, &vlogtmp);
+                                        vblock.push(vlogtmp.name, vlogtmp);
+                                        // Add subhierarchy
+                                        //subhierarchy_tmp += vlogtmp.subhierarchy;
 
                                         //for (auto& mtp: vlogtmp.inner_modules) mod_defs_tmp.push_back(mtp);
                                         for (auto& mtp: vlogtmp.inner_moddefs)
@@ -374,6 +386,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 // Pass stream to parser to process module content
                 VerilogBlock vlogtmp = Parser::__parse__(mod_defs_tmp, module_references_tmp,
                                                          sources, lib,
+                                                         orphans_tmp,
                                                             stream, pbar,
                                                             start_line,
                                                             ancestors_tmp,
@@ -1210,13 +1223,38 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 // Create instance
                 VerilogBlock instance_tmp;
 
-                instance_tmp.ref = module_ref_name;
-                instance_tmp.name = instance_name;
-                instance_tmp.parameters = inst_params;
-                instance_tmp.ancestors = ancestors_tmp;
+                // check if module exists
+                if (module_references.contains(module_ref_name)){
+                    instance_tmp = module_references.at(module_ref_name);
+                    instance_tmp.parameters = inst_params;
+                    instance_tmp.ancestors = ancestors_tmp;
+                    instance_tmp.ref = module_ref_name;
+                    instance_tmp.name = instance_name;
+                    // Push into vector
+                    vblock.push(module_ref_name, instance_tmp);
 
-                // Push into vector
-                vblock.push(module_ref_name, instance_tmp);
+                    // Add to subhierarchy
+                    //subhierarchy_tmp += instance_tmp.subhierarchy;
+                } else {
+                    std::string subhierarchy_tmp = string_format("%s\"ref\": \"%s\"\n",
+                                                                 TAB.c_str(),module_ref_name.c_str());
+                    instance_tmp.ref = module_ref_name;
+                    instance_tmp.name = instance_name;
+                    instance_tmp.parameters = inst_params;
+                    instance_tmp.ancestors = ancestors_tmp;
+                    instance_tmp.subhierarchy = subhierarchy_tmp;
+
+                    // Push into vector
+                    vblock.push(module_ref_name, instance_tmp);
+
+                    if (!orphans_tmp.contains(module_ref_name)){
+                        orphans_tmp.insert(std::pair<std::string,std::vector<std::string>>(module_ref_name,{instance_name}));
+                    } else {
+                        orphans_tmp.at(module_ref_name).push_back({instance_name});
+                    }
+
+                }
+
 
                 // Push into children vector
                 if (std::find(children_tmp.begin(), children_tmp.end(), module_ref_name) == children_tmp.end()) children_tmp.push_back(module_ref_name);
@@ -1281,8 +1319,12 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
     vblock.children = children_tmp;
     vblock.inner_modules = mod_defs_tmp;
     vblock.inner_moddefs = mod_defs_tmp_str;
+    vblock.orphans = orphans_tmp;
     // build subhierarchy before returning block
     vblock.__build_subhierarchy__(TAB);
+
+    // Push orphans?
+
 
     // Add module_definitions
     for (auto& mdt: mod_defs_tmp) {

@@ -20,6 +20,7 @@ private:
                            std::map<std::string,VerilogBlock>& module_references,
                            std::vector <std::string>& sources,
                            std::vector <std::string>& lib,
+                           std::map<std::string,std::vector<std::string>>& orphan_instances,
                            std::ifstream& stream,
                            progressBar& pbar,
                            int& start_line,
@@ -34,6 +35,7 @@ private:
                                 std::map<std::string,VerilogBlock>& module_references,
                                 std::vector <std::string>& sources,
                                 std::vector <std::string>& lib,
+                                std::map<std::string,std::vector<std::string>>& orphan_instances,
                                 std::string FILENAME,
                                 std::string NAME);
 
@@ -67,10 +69,12 @@ public:
     VerilogBlock parse(std::vector<VerilogBlock>& module_definitions,
                        std::map<std::string,VerilogBlock>& module_references,
                        std::vector<std::string> &sources,
-                       std::vector<std::string> &lib) {return __parse_file__(module_definitions,
+                       std::vector<std::string> &lib,
+                       std::map<std::string,std::vector<std::string>>& orphan_instances) {return __parse_file__(module_definitions,
                                                                               module_references,
                                                                               sources,
                                                                               lib,
+                                                                              orphan_instances,
                                                                               FILENAME,
                                                                               NAME);}
 

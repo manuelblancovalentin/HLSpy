@@ -9,7 +9,6 @@
 void VerilogBlock::__build_subhierarchy__(std::string TAB = ""){
 
     // Get all fields
-    subhierarchy = "";
     //std::vector<Parameter>* tmp_params = &(this->parameters);
     //Ports* tmp_ports = &(this->ports);
     //std::vector<NetWire>* tmp_netwires = &(this->netwires);
@@ -21,7 +20,12 @@ void VerilogBlock::__build_subhierarchy__(std::string TAB = ""){
     bool print_instances = !instances.empty();
 
     // Place reference
-    subhierarchy += string_format("%s\"ref\" : \"%s\",\n", TAB.c_str(), name.c_str());
+    if (ref.compare("module") == 0){
+        subhierarchy = string_format("%s\"ref\" : \"%s\",\n", TAB.c_str(), name.c_str());
+    } else {
+        subhierarchy = string_format("%s\"ref\" : \"%s\",\n", TAB.c_str(), ref.c_str());
+    }
+
     //tmp["ref"] = ref;
 
     // Parse parameters
@@ -30,7 +34,7 @@ void VerilogBlock::__build_subhierarchy__(std::string TAB = ""){
         subhierarchy += string_format("%s\"parameters\" : \n%s{\n", TAB.c_str(), TAB.c_str());
         int pmax = parameters.size();
         for (int p = 0; p < pmax; p++){
-            subhierarchy += string_format("%s\"%s\" : \"%s\"", TAB.c_str() + '\t',
+            subhierarchy += string_format("%s\t\"%s\" : \"%s\"", TAB.c_str(),
                                        parameters[p].name.c_str(),
                                        parameters[p].value.c_str());
             if (p != (pmax-1)){
@@ -138,9 +142,58 @@ void VerilogBlock::__build_subhierarchy__(std::string TAB = ""){
         }
     }
 
+    if (print_instances){
+        int nimax = instances.size();
+        int ni = 0;
+        for (auto& it: instances) {
+            // Open netwire field
+            int niimax = it.second.size();
+            int nii = 0;
+            for (auto &itt: it.second){
+                subhierarchy += string_format("%s\"%s\" : {\n%s%s", TAB.c_str(), itt.name.c_str(), TAB.c_str(), TAB.c_str());
+                subhierarchy += itt.subhierarchy;
+                subhierarchy += "\n" + TAB + "}";
+
+                if ((nii != (niimax-1)) | (ni != (nimax-1))) {
+                    subhierarchy += ",";
+                }
+                subhierarchy += "\n";
+                nii++;
+            }
+            ni++;
+        }
+    }
+
 };
 
 
+void VerilogBlock::__fix_orphans__(std::map<std::string,VerilogBlock>& module_references){
+    // Check for orphan modules
+    for (auto& o: orphans){
+        if (module_references.contains(o.first)){
+            for (auto& ob: o.second){
+                if (instances.contains(o.first)){
+                    for (auto& itt: instances.at(o.first)){
+                        // Assign everything
+                        itt.parameters = module_references.at(o.first).parameters;
+                        itt.ancestors = module_references.at(o.first).ancestors;
+                        itt.subhierarchy = module_references.at(o.first).subhierarchy;
+                        itt.instances = module_references.at(o.first).instances;
+                        itt.netwires = module_references.at(o.first).netwires;
+                        itt.children = module_references.at(o.first).children;
+                        itt.ports = module_references.at(o.first).ports;
+                        itt.orphans = module_references.at(o.first).orphans;
+                        itt.ref = o.first;
+                        // Fix orphans down below
+                        itt.__fix_orphans__(module_references);
+                    }
+                }
+            }
+        }
+    }
+    // Now rebuild subhierarchy
+    __build_subhierarchy__();
+}
 
 
 // Instance push
