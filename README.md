@@ -1,9 +1,24 @@
 
 <img src="./__res__/artwork/logo_blur.png" alt="drawing" width="400"/>
 
-# Verilog Cheatsheet
+# HackDL: a C++ tool for automated hardware description language manipulation
 
-## Line-break instructions
+## What is this for?
+This is missing
+
+## Installation
+
+This is missing
+
+## How to use
+
+This is missing
+
+
+
+## Verilog Cheatsheet
+
+### Line-break instructions
 These instructions start and look for a new-line ending. Anything between their start-word and the next \n (end of the line) will be considered as part of the instruction.
 
 | Instruction   |      Example      |  Start word | End word | Ignore Recursive? |
@@ -17,7 +32,7 @@ These instructions start and look for a new-line ending. Anything between their 
 These instructions are easily parsed precisely because they do not need accumulation at all. Once you find a word, you can match it. Also, we don't care about any further keywords that might appear. For instance, an include followed by the word define in the same sentence, should be captured as an include. The define is ignored. Thus, we can ignore any recursive search for other keywords. 
 
 
-## Recursivity-blocking instructions
+### Recursivity-blocking instructions
 Say that we find the start of a block comment ``/*``, we know that we have to keep looking until we find the end of that comment ``*/``. That can happen either in the same line or in following lines. If it's not in the same line, then we gotta ignore whatever there is on those lines until we find the endword. No matter if there's an initial/always/module block, whatever. It's all a comment. All of these are nul. These are recursivity-blocking instructions. 
 
 | Instruction   |      Example      |  Start word | End word | Ignore Recursive? |
@@ -283,3 +298,16 @@ top_modules
          
 ```
 
+## Citing us
+Please, consider citing us in your publications if you found this code useful. If so, please use the following bib entry:
+
+```
+@misc{hackdl,
+  author = {B. Valentin, Manuel and Ogrenci-Memik, Seda and Fahim, Farah and Miranda, Llovizna},
+  title = {HackDL: a C++ tool for automated hardware description language manipulation},
+  year = {2021},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/manuelblancovalentin/HackDL}
+}
+```
